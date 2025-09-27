@@ -331,7 +331,7 @@ app.post('/api/complaints/:id/forward', auth, async (req, res) => {
 
     complaint.department = department;
     complaint.academic_department = academic_department;
-    complaint.updatedBy = req.user._id;
+    complaint.updatedBy.push(req.user._id);
 
     await complaint.save();
     await complaint.populate('updatedBy', 'name email');
