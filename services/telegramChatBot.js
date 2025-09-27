@@ -24,6 +24,7 @@ Your capabilities:
 Important:
 - Always authenticate users with college credentials using the user_auth tool when the chat begins, otherwise the submit_complaint tool doesn't work.
 - Once a complaint is submitted, provide the complaint ID to the user
+- When user requests to view their complaints, use the fetch_complaints tool to retrieve and display them.
 
 Guidelines:
 - Always be polite and understanding
@@ -69,6 +70,7 @@ class SubmitComplaintTool {
 }
 
 class UserAuthTool {
+    
     name = "user_auth";
     description = "Authenticate user with college credentials";
     schema = {
@@ -94,7 +96,45 @@ class UserAuthTool {
     }
 }
 
-const tools = [new SubmitComplaintTool(), new UserAuthTool()];
+class FetchComplaintsTool {
+    name = "fetch_complaints";
+    description = "Fetch all complaints registered by the authenticated user";
+    schema = {
+        type: "object",
+        properties: {},
+        required: []
+    };
+    
+    async call() {
+        try {
+            if (!JWTtoken) {
+                return "❌ Please authenticate first using your college credentials before fetching complaints.";
+            }
+
+            const response = await axios.get('http://localhost:5000/api/complaints', {
+                headers: { 'Authorization': `Bearer ${JWTtoken}` }
+            });
+
+            if (!response.data || response.data.length === 0) {
+                return "No complaints found for your account.";
+            }
+
+            // Extract complaint IDs and create button data
+            const complaintData = response.data.map(complaint => ({
+                id: complaint._id,
+                title: complaint.title,
+                status: complaint.status
+            }));
+            return `COMPLAINTS_BUTTONS:${JSON.stringify(complaintData)}`;
+        } catch (error) {
+            console.error('Fetch complaints error:', error.response?.data || error.message);
+            return `❌ Error fetching complaints: ${error.response?.data?.error || error.message}`;
+        }
+    }
+}
+
+const tools = [new SubmitComplaintTool(), new UserAuthTool(), new FetchComplaintsTool()];
+
 const modelWithTools = llm.bindTools(tools.map(t => ({
     type: "function",
     function: { name: t.name, description: t.description, parameters: t.schema }
@@ -149,7 +189,7 @@ bot.on('message', async (msg) => {
             { configurable: { thread_id: threadId } }
         );
         
-        const response = result.messages[result.messages.length - 1];
+        const response = result.messages[result.messages.length - 1];  
         bot.sendMessage(msg.chat.id, response.content);
     } catch (error) {
         bot.sendMessage(msg.chat.id, `Error processing message: ${error.message}`);
