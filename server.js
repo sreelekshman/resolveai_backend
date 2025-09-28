@@ -13,6 +13,7 @@ const NotificationService = require('./services/notificationService');
 const BackgroundScheduler = require('./schedulers/backgroundScheduler');
 const telegramService = require('./services/telegramService');
 const telegramBot = require('./services/telegramChatBot');
+const langgraphService = require('./services/langgraphService');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -308,6 +309,31 @@ app.get('/api/complaints/:id', auth, async (req, res) => {
   }
 });
 
+app.patch('/api/complaints/close/:id', auth, async (req, res) => {
+  try {
+    const complaint = await Complaint.findById(req.params.id);
+    if (!complaint) {
+      return res.status(404).json({ error: 'Complaint not found' });
+    }
+
+    // Only the submitter or admin can close the complaint
+    if (req.user.role !== 'admin' && complaint.submittedBy.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+    
+    complaint.status = 'closed';
+    complaint.updatedBy.push(req.user._id);
+    await complaint.save();
+    await complaint.populate('updatedBy', 'name email');
+    
+    await telegramService.sendMessageToUser(process.env.USERID, `Your complaint titled "${complaint.title}" has been closed by ${req.user.name}.`);
+    res.json(complaint);
+  }
+  catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Forwarding complaint to another department
 app.post('/api/complaints/:id/forward', auth, async (req, res) => {
   try {
@@ -364,6 +390,23 @@ app.post('/api/complaints/status/:id', auth, async (req, res) => {
 
     res.json(complaint);
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// LLM Response from LangGraph
+app.post('/api/llm-response', auth, async (req, res) => {
+  try {
+    const { query, threadId } = req.body;
+
+    if (!query || query.trim() === '') {
+      return res.status(400).json({ error: 'Query text is required' });
+    }
+    
+    const response = await langgraphService.LLMResponse(query, threadId);
+    res.json({ response });
+  } catch (error) {
+    console.error('LLM response error:', error);
     res.status(500).json({ error: error.message });
   }
 });
