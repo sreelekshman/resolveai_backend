@@ -24,7 +24,8 @@
     "langchain": "^0.3.34",
     "mongoose": "^8.16.5",
     "node-cron": "^4.2.1",
-    "node-telegram-bot-api": "^0.66.0"
+    "node-telegram-bot-api": "^0.66.0",
+    "nodemailer": "^7.0.6"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"

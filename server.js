@@ -23,7 +23,7 @@ app.use(cors({
   origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
   credentials: true,
   optionsSuccessStatus: 200,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 app.use(express.json());
@@ -335,7 +335,7 @@ app.patch('/api/complaints/close/:id', auth, async (req, res) => {
 });
 
 // Forwarding complaint to another department
-app.post('/api/complaints/:id/forward', auth, async (req, res) => {
+app.patch('/api/complaints/:id/forward', auth, async (req, res) => {
   try {
     // Check if user has permission to forward complaints
     if (req.user.role === 'student') {
@@ -380,13 +380,22 @@ app.post('/api/complaints/status/:id', auth, async (req, res) => {
       return res.status(403).json({ error: 'Not authorized for this department' });
     }
 
-    const {status} = req.body;
+    const {status, resolutionNote} = req.body;
+    console.log("Status:", status);
     complaint.status = status;
+    complaint.resolutionNote = resolutionNote;
+
     complaint.updatedBy.push(req.user._id);
 
     await complaint.save();
     await complaint.populate('updatedBy', 'name email');
-    await telegramService.sendMessageToUser(process.env.USERID, `Your complaint titled "${complaint.title}" has been updated to status: ${complaint.status}`);
+    if (complaint.status === 'resolved'){
+      NotificationService.sendStatusUpdateNotification(complaint._id, status, resolutionNote);
+      await telegramService.sendMessageToUser(process.env.USERID, `Your complaint titled "${complaint.title}" has been resolved. \n\n Resolution Note: ${complaint.resolutionNote}`);
+    }
+    else{
+      await telegramService.sendMessageToUser(process.env.USERID, `Your complaint titled "${complaint.title}" has been updated to status: ${complaint.status}`);
+    }
 
     res.json(complaint);
   } catch (error) {

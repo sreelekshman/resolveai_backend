@@ -56,7 +56,9 @@ const complaintSchema = new mongoose.Schema({
       default: Date.now
     }
   }],
-  resolutionNotes: String,
+  resolutionNote: {
+    type: String
+  },
 
   attachments: [{
     filename: String,
@@ -73,6 +75,25 @@ const complaintSchema = new mongoose.Schema({
       type: Date,
       default: Date.now
     }
+  }],
+  escalationLevel: {
+    type: Number,
+    default: 0
+  },
+  escalatedAt: {
+    type: Date
+  },
+  escalationHistory: [{
+    level: Number,
+    assignedTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    escalatedAt: {
+      type: Date,
+      default: Date.now
+    },
+    reason: String
   }]
 }, {
   timestamps: true
